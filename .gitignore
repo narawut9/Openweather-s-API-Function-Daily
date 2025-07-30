@@ -1,0 +1,17 @@
+# Environment
+.env 
+__pycache__/
+*.pyc
+env/
+.env/
+
+# Logs
+logs/
+*.log
+
+# VSCode / Editor config
+.vscode/
+time_zone_management.py
+test.py
+
+models.sql
