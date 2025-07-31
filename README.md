@@ -24,10 +24,9 @@ weather_etl_project/
 ---
 ### 1. Clone the repo
 
-```bash
+```yaml
 git clone https://github.com/yourusername/weather_etl_project.git
 ```
-
 
 ## Create and activate virtual environment
 
@@ -47,7 +46,20 @@ pip install -r requirements.txt
 python main.py
 ```
 
----
+## Example Insert Output
+
+```yaml
+2025-07-31 11:40:08,235 | INFO | === Start Weather ETL ===
+2025-07-31 11:40:08,591 | INFO | Connect to PostgreSQL database successfully
+2025-07-31 11:40:08,625 | INFO | Summarizing weather for 2025-07-30 (UTC Range: 2025-07-29 17:00:00+00:00 → 2025-07-30 16:59:59+00:00)
+2025-07-31 11:40:08,722 | INFO | Fetched 124 station summaries.
+2025-07-31 11:40:08,761 | INFO | Complete to Inserted summarized weather data. (WeatherStationID: 2561, DateTime = 2025-07-30 00:00:00+00:00)
+...
+2025-07-31 11:40:13,041 | INFO | ETL Completed
+2025-07-31 11:40:13,041 | INFO | Total successful inserts: 124
+2025-07-31 11:40:13,042 | INFO | Closed database connection.
+2025-07-31 11:40:13,042 | INFO | Process Completed
+```
 
 ## Flowchart (Daily Summary)
 
