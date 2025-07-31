@@ -4,13 +4,11 @@ import pytz
 from datetime import datetime, timezone ,timedelta ,time
 from dotenv import load_dotenv
 import os
-import logging
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)s | %(message)s"
 )
-
 
 def get_utc_range_for_yesterday_local():
     try:
@@ -26,6 +24,7 @@ def get_utc_range_for_yesterday_local():
         return local_yesterday, start_time, end_time
     except Exception as e:
         logging.error(e)
+        return None,  None, None
 
 # Connect to DB
 load_dotenv()
@@ -47,10 +46,7 @@ def get_db_connection(DB_CONFIG):
         logging.error(f"[ERROR] Failed to connect to Database : {e}")
         exit(1)
 
-# Get connect 
-conn = get_db_connection(DB_CONFIG)
-
-def summarize_daily_weather():
+def summarize_daily_weather(conn):
     cur = conn.cursor()
     local_date, start_time, end_time = get_utc_range_for_yesterday_local()
     logging.info(f"Summarizing weather for {local_date} (UTC Range: {start_time} → {end_time})")
@@ -74,9 +70,9 @@ def summarize_daily_weather():
         GROUP BY weather_station_id;
     """
     try:
-        cur.execute(sql_query,(local_date, start_time, end_time))
-        rows = cur.fetchall()
-        cur.close()
+        with conn.cursor() as cur:
+            cur.execute(sql_query,(local_date, start_time, end_time))
+            rows = cur.fetchall()
         logging.info(f"Fetched {len(rows)} station summaries.")
         return rows
     except Exception as e:
@@ -84,86 +80,64 @@ def summarize_daily_weather():
         return []
 
 # Insert data 
+def process_weather_data(conn):
+    def safe_cast(val, cast_type=float, default=None):
+        try:
+            return cast_type(val)
+        except (ValueError, TypeError):
+            return default
 
-def process_weather_data():
-    cur = conn.cursor()
-    weather_daily = summarize_daily_weather()
+    weather_daily = summarize_daily_weather(conn)
     create_by = 'Narawut.T'
     update_by = 'Narawut.T'
     create_date = datetime.now(timezone.utc)
     update_date = datetime.now(timezone.utc)
 
     count_stations = 0
-    for row in weather_daily:
-        try:
-            weather_station_id = int(row[0])
-            obs_datetime = str(row[1])
+    with conn.cursor() as cur:
+        for row in weather_daily:
+            try:
+                weather_station_id = safe_cast(row[0], int)
+                obs_datetime = row[1] 
 
-            try: temp = float(row[2])
-            except: temp = None
+                temp = safe_cast(row[2])
+                temp_max = safe_cast(row[3])
+                temp_min = safe_cast(row[4])
+                feels_like = safe_cast(row[5])
+                humidity = safe_cast(row[6])
+                pressure = safe_cast(row[7])
+                rainfall = safe_cast(row[8])
+                wind_speed = safe_cast(row[9])
+                wind_gust_max = safe_cast(row[10])
+                cloud = safe_cast(row[11])
+                weather_description = safe_cast(row[12], str)
 
-            try: temp_max = float(row[3])
-            except: temp_max  = None
+                sql_query = ''' 
+                    INSERT INTO weather."tblWeather_daily_ow"(
+                        weather_station_id, obs_datetime, temp, temp_max, temp_min, 
+                        feels_like, humidity, pressure, rainfall, wind_speed, 
+                        wind_gust_max, cloud, weather_description, create_by, create_date, 
+                        update_by, update_date)
+                    VALUES (
+                    %s, %s, %s, %s, %s, 
+                    %s, %s, %s, %s, %s, 
+                    %s, %s, %s, %s, %s, 
+                    %s, %s);
+                '''
+                cur.execute(sql_query, (
+                    weather_station_id, obs_datetime, temp, temp_max, temp_min,
+                    feels_like, humidity, pressure, rainfall,
+                    wind_speed, wind_gust_max, cloud,
+                    weather_description,
+                    create_by, create_date, update_by, update_date
+                ))
+                count_stations += 1
+                logging.info(f"Complete to Inserted summarized weather data. (WeatherStationID: {weather_station_id}, DateTime = {obs_datetime})")
 
-            try: temp_min = float(row[4])
-            except: temp_min = None
-
-            try: feels_like = float(row[5])
-            except: feels_like = None
-
-            try: humidity = float(row[6])
-            except: humidity = None
-
-            try: pressure = float(row[7])
-            except: pressure = None
-
-            try: rainfall = float(row[8])
-            except: rainfall = None
-
-            try: wind_speed = float(row[9])
-            except: wind_speed = None
-
-            try: wind_gust_max = float(row[10])
-            except: wind_gust_max = None
-
-            try: cloud = float(row[11])
-            except: cloud = None
-
-            try: weather_description = str(row[12])
-            except: weather_description = None
-
-            # Insert SQL
-            sql_query = '''
-                INSERT INTO weather."tblWeather_daily_ow"(
-                    weather_station_id, obs_datetime, temp, temp_max, temp_min, 
-                    feels_like, humidity, pressure, rainfall, wind_speed, 
-                    wind_gust_max, cloud, weather_description, create_by, create_date, 
-                    update_by, update_date)
-                VALUES (
-                %s, %s, %s, %s, %s, 
-                %s, %s, %s, %s, %s, 
-                %s, %s, %s, %s, %s, 
-                %s, %s);
-            '''
-            cur.execute(sql_query, (
-                weather_station_id, obs_datetime, temp, temp_max, temp_min,
-                feels_like, humidity, pressure, rainfall,
-                wind_speed, wind_gust_max, cloud,
-                weather_description,
-                 create_by, create_date, update_by, update_date
-            ))
-            count_stations +=1
-            logging.info(f"Complete to Inserted summarized weather data. (WeatherStationID: {weather_station_id}, DateTime = {obs_datetime})")
-
-        except Exception as e:
-            conn.rollback()
-            logging.error(f" Insert error: StationID {weather_station_id} {e}")
+            except Exception as e:
+                conn.rollback()
+                logging.error(f" Insert error: StationID {weather_station_id} {e}")
     
-    conn.commit()
-    cur.close()
-
-
+        conn.commit()
     logging.info("ETL Completed")
     logging.info(f"Total successful inserts: {count_stations}")
-
-process_weather_data()
