@@ -47,7 +47,6 @@ def get_db_connection(DB_CONFIG):
         exit(1)
 
 def summarize_daily_weather(conn):
-    cur = conn.cursor()
     local_date, start_time, end_time = get_utc_range_for_yesterday_local()
     logging.info(f"Summarizing weather for {local_date} (UTC Range: {start_time} → {end_time})")
     sql_query = """

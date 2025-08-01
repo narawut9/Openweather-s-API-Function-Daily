@@ -1,5 +1,5 @@
 # Weather Daily Summarize Pipeline  
-Extarct hourly weather data from OpenWeather APYI, transfrom to daily summary,  and insert into PostgreSQL database.
+Extarct hourly weather data from OpenWeather API, transfrom to daily summary,  and insert into PostgreSQL database.
 
 ---
 
